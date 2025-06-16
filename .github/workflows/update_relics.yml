@@ -12,6 +12,8 @@ jobs:
     steps:
     - name: Clonar repositório
       uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GH_PAT }}
 
     - name: Configurar Python
       uses: actions/setup-python@v4
