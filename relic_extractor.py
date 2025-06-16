@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 
-URL = "https://warframe-web-assets.nyc3.cdn.digitaloceanspaces.com/uploads/cms/hnfvc0o3jnfvc873njb03enrf56.html#missionRewards"
+URL = "https://warframe-web-assets.nyc3.cdn.digitaloceanspaces.com/uploads/cms/hnfvc0o3jnfvc873njb03enrf56.html"
 
 print("🔄 Baixando página oficial...")
 response = requests.get(URL)
@@ -10,15 +10,24 @@ html = response.text
 
 soup = BeautifulSoup(html, "html.parser")
 
-print("🔍 Procurando seção 'Mission Rewards'...")
-section = soup.find(id="missionRewards")
-if not section:
+print("🔍 Procurando a seção 'Mission Rewards' pelo texto...")
+
+# Buscar pela tag que contenha texto 'Mission Rewards'
+mission_rewards_header = None
+for header in soup.find_all(['h2', 'h3', 'h4', 'h5']):
+    if "Mission Rewards" in header.text:
+        mission_rewards_header = header
+        break
+
+if not mission_rewards_header:
     raise Exception("❌ Seção 'Mission Rewards' não encontrada.")
 
-# A seção tem várias linhas de recompensas (exemplo para ilustrar)
-# Vamos pegar todos os textos que mencionem Lith, Meso, Neo ou Axi e eliminar os radiant
+# A seção desejada deve estar logo após esse header
+section = mission_rewards_header.find_next_sibling()
+if not section:
+    raise Exception("❌ Conteúdo após 'Mission Rewards' não encontrado.")
 
-print("🧹 Extraindo reliquias...")
+print("🧹 Extraindo reliquias da seção...")
 
 eras = {
     "Lith": set(),
@@ -27,19 +36,12 @@ eras = {
     "Axi": set(),
 }
 
-# Aqui vou assumir que as relíquias aparecem como texto dentro da seção,
-# e que os nomes tem as eras no início: "Lith G17", "Meso Ceti", etc.
-# Também ignoraremos as que terminam com "Radiant"
-
-texts = section.stripped_strings
-for text in texts:
-    # Checa se é reliquia de alguma era
+# Vamos buscar dentro da section todos os textos que começam com Lith, Meso, Neo, Axi e ignorar radiant
+for el in section.find_all(text=True):
+    text = el.strip()
     for era in eras.keys():
-        if text.startswith(era):
-            # Ignora radiant
-            if "Radiant" not in text:
-                # Remove possíveis detalhes extras depois do nome (se quiser)
-                eras[era].add(text.strip())
+        if text.startswith(era) and "Radiant" not in text:
+            eras[era].add(text)
             break
 
 print("🔧 Montando tabela HTML...")
@@ -57,10 +59,8 @@ html_table = """
   <tbody>
 """
 
-# Vamos calcular o número máximo de linhas entre as colunas para montar a tabela alinhada
 max_rows = max(len(eras["Lith"]), len(eras["Meso"]), len(eras["Neo"]), len(eras["Axi"]))
 
-# Convertendo sets para listas e ordenando
 list_lith = sorted(eras["Lith"])
 list_meso = sorted(eras["Meso"])
 list_neo = sorted(eras["Neo"])
@@ -79,7 +79,6 @@ html_table += """
 </table>
 """
 
-# Salvar em arquivo
 with open("output/relics.html", "w", encoding="utf-8") as f:
     f.write(html_table)
 
