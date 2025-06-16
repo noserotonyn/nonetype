@@ -1,89 +1,81 @@
 import requests
 from bs4 import BeautifulSoup
-from collections import defaultdict
-import time
+import re
+import os
 
 URL = "https://warframe-web-assets.nyc3.cdn.digitaloceanspaces.com/uploads/cms/hnfvc0o3jnfvc873njb03enrf56.html"
+OUTPUT_DIR = "output"
+OUTPUT_FILE = os.path.join(OUTPUT_DIR, "relics.html")
 
-# Tentativas para contornar falhas de rede
-for attempt in range(3):
-    try:
-        print("🔄 Baixando página oficial...")
-        response = requests.get(URL, timeout=10)
-        response.raise_for_status()
-        break
-    except Exception as e:
-        print(f"⚠️ Tentativa {attempt + 1} falhou: {e}")
-        if attempt == 2:
-            raise Exception("❌ Falha ao baixar a página após 3 tentativas")
-        time.sleep(5)
+print("🔄 Baixando página oficial...")
+response = requests.get(URL)
+soup = BeautifulSoup(response.text, "html.parser")
 
-html = response.text
-soup = BeautifulSoup(html, 'html.parser')
+print("🔍 Procurando a tabela de missões...")
+table = soup.find("table")
+if not table:
+    raise Exception("❌ Tabela de missões não encontrada.")
 
-print("🔍 Procurando tabela de missões...")
-mission_tables = soup.find_all("table")
-if not mission_tables:
-    raise Exception("❌ Nenhuma tabela encontrada na página.")
+# Regex para relíquias válidas (ex: Axi G7 Relic)
+relic_pattern = re.compile(r"^(Lith|Meso|Neo|Axi) [A-Z]\d+ Relic$")
 
-relics_by_era = defaultdict(set)
-eras = ["Lith", "Meso", "Neo", "Axi"]
+# Separar relíquias por era
+columns = {"Lith": [], "Meso": [], "Neo": [], "Axi": []}
 
-for table in mission_tables:
-    rows = table.find_all("tr")
-    for row in rows:
-        cells = row.find_all("td")
-        for cell in cells:
-            text = cell.get_text(strip=True)
-            for era in eras:
-                if text.startswith(era):
-                    relics_by_era[era].add(text.split(" (" )[0])
+for row in table.find_all("tr")[1:]:
+    cells = row.find_all("td")
+    for cell in cells:
+        text = cell.get_text(strip=True)
+        if relic_pattern.match(text):
+            era = text.split()[0]
+            if text not in columns[era]:
+                columns[era].append(text)
 
-# HTML formatado em tabela
-print("📝 Gerando HTML...")
-html_output = """
+print("✅ Relíquias extraídas com sucesso!")
+
+# Criar diretório se não existir
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# Criar tabela HTML
+html_output = """<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
+    <title>Relíquias Atuais</title>
     <style>
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { width: 100%%; border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; }
+        th { background-color: #f0f0f0; }
     </style>
 </head>
 <body>
-    <h1>Relíquias Disponíveis em Missões</h1>
+    <h1>Relíquias Atuais por Era</h1>
     <table>
         <tr>
-"""
-
-# Cabeçalhos
-for era in eras:
-    html_output += f"            <th>{era}</th>\n"
-html_output += "        </tr>\n        <tr>\n"
-
-# Pegar o maior número de relíquias entre as eras para criar as linhas corretamente
-max_len = max(len(relics_by_era[era]) for era in eras)
-
-# Organizar como lista
-era_lists = {era: sorted(relics_by_era[era]) for era in eras}
-
-for i in range(max_len):
-    html_output += "        <tr>\n"
-    for era in eras:
-        relic = era_lists[era][i] if i < len(era_lists[era]) else ""
-        html_output += f"            <td>{relic}</td>\n"
-    html_output += "        </tr>\n"
-
-html_output += """
+            <th>Lith</th>
+            <th>Meso</th>
+            <th>Neo</th>
+            <th>Axi</th>
+        </tr>
+        <tr>
+            <td>{}</td>
+            <td>{}</td>
+            <td>{}</td>
+            <td>{}</td>
+        </tr>
     </table>
 </body>
 </html>
-"""
+""".format(
+    "<br>".join(columns["Lith"]),
+    "<br>".join(columns["Meso"]),
+    "<br>".join(columns["Neo"]),
+    "<br>".join(columns["Axi"]),
+)
 
 # Salvar arquivo
-output_path = "output/relics.html"
-with open(output_path, "w", encoding="utf-8") as f:
+with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
     f.write(html_output)
 
-print(f"✅ Arquivo gerado com sucesso em {output_path}")
+print(f"💾 Arquivo salvo em: {OUTPUT_FILE}")
