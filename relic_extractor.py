@@ -1,64 +1,86 @@
 import requests
 from bs4 import BeautifulSoup
-import os
 
-URL = "https://warframe-web-assets.nyc3.cdn.digitaloceanspaces.com/uploads/cms/hnfvc0o3jnfvc873njb03enrf56.html"
+URL = "https://warframe-web-assets.nyc3.cdn.digitaloceanspaces.com/uploads/cms/hnfvc0o3jnfvc873njb03enrf56.html#missionRewards"
 
 print("🔄 Baixando página oficial...")
 response = requests.get(URL)
-soup = BeautifulSoup(response.content, 'html.parser')
+response.raise_for_status()
+html = response.text
 
-if response.status_code != 200:
-    print(f"❌ Erro ao acessar a página. Código {response.status_code}")
-    exit(1)
+soup = BeautifulSoup(html, "html.parser")
 
-# Define o que é uma relíquia
-def is_relic(text):
-    return any(text.startswith(prefix) for prefix in ["Lith ", "Meso ", "Neo ", "Axi "])
+print("🔍 Procurando seção 'Mission Rewards'...")
+section = soup.find(id="missionRewards")
+if not section:
+    raise Exception("❌ Seção 'Mission Rewards' não encontrada.")
 
-# Encontrar a primeira tabela (a de Missões)
-print("🔍 Procurando primeira tabela com relíquias...")
-tables = soup.find_all("table")
-if not tables:
-    print("❌ Nenhuma tabela encontrada.")
-    exit(1)
+# A seção tem várias linhas de recompensas (exemplo para ilustrar)
+# Vamos pegar todos os textos que mencionem Lith, Meso, Neo ou Axi e eliminar os radiant
 
-# Extrair da primeira tabela
-table = tables[0]
+print("🧹 Extraindo reliquias...")
 
-relics = set()
-for td in table.find_all("td"):
-    text = td.get_text(strip=True)
-    if is_relic(text):
-        relics.add(text)
+eras = {
+    "Lith": set(),
+    "Meso": set(),
+    "Neo": set(),
+    "Axi": set(),
+}
 
-if not relics:
-    print("⚠️ Nenhuma relíquia encontrada na primeira tabela.")
-    exit(1)
+# Aqui vou assumir que as relíquias aparecem como texto dentro da seção,
+# e que os nomes tem as eras no início: "Lith G17", "Meso Ceti", etc.
+# Também ignoraremos as que terminam com "Radiant"
 
-# Organizar relíquias
-organized = {"Lith": [], "Meso": [], "Neo": [], "Axi": []}
-for relic in sorted(relics):
-    for prefix in organized:
-        if relic.startswith(prefix):
-            organized[prefix].append(relic)
+texts = section.stripped_strings
+for text in texts:
+    # Checa se é reliquia de alguma era
+    for era in eras.keys():
+        if text.startswith(era):
+            # Ignora radiant
+            if "Radiant" not in text:
+                # Remove possíveis detalhes extras depois do nome (se quiser)
+                eras[era].add(text.strip())
+            break
 
-# Gerar HTML
-print("📝 Gerando HTML...")
-html_content = "<html><head><meta charset='utf-8'><title>Relíquias Atuais</title></head><body>"
-html_content += "<h2>Relíquias Atuais Disponíveis em Missões</h2>"
+print("🔧 Montando tabela HTML...")
 
-for category in ["Lith", "Meso", "Neo", "Axi"]:
-    html_content += f"<h3>{category}</h3><ul>"
-    for relic in organized[category]:
-        html_content += f"<li>{relic}</li>"
-    html_content += "</ul>"
+html_table = """
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%; text-align: left;">
+  <thead>
+    <tr>
+      <th>Lith</th>
+      <th>Meso</th>
+      <th>Neo</th>
+      <th>Axi</th>
+    </tr>
+  </thead>
+  <tbody>
+"""
 
-html_content += "</body></html>"
+# Vamos calcular o número máximo de linhas entre as colunas para montar a tabela alinhada
+max_rows = max(len(eras["Lith"]), len(eras["Meso"]), len(eras["Neo"]), len(eras["Axi"]))
 
-os.makedirs("output", exist_ok=True)
+# Convertendo sets para listas e ordenando
+list_lith = sorted(eras["Lith"])
+list_meso = sorted(eras["Meso"])
+list_neo = sorted(eras["Neo"])
+list_axi = sorted(eras["Axi"])
 
+for i in range(max_rows):
+    html_table += "<tr>"
+    html_table += f"<td>{list_lith[i] if i < len(list_lith) else ''}</td>"
+    html_table += f"<td>{list_meso[i] if i < len(list_meso) else ''}</td>"
+    html_table += f"<td>{list_neo[i] if i < len(list_neo) else ''}</td>"
+    html_table += f"<td>{list_axi[i] if i < len(list_axi) else ''}</td>"
+    html_table += "</tr>"
+
+html_table += """
+  </tbody>
+</table>
+"""
+
+# Salvar em arquivo
 with open("output/relics.html", "w", encoding="utf-8") as f:
-    f.write(html_content)
+    f.write(html_table)
 
-print("✅ HTML gerado com sucesso: output/relics.html")
+print("✅ Arquivo 'output/relics.html' gerado com sucesso.")
