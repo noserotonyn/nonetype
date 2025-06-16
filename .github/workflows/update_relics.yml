@@ -2,8 +2,8 @@ name: Update Relics HTML
 
 on:
   schedule:
-    - cron: '0 12 * * 1'  # Toda segunda-feira às 12h UTC
-  workflow_dispatch:       # Permite rodar manualmente pelo GitHub
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -20,9 +20,11 @@ jobs:
       run: python relic_extractor.py
 
     - name: Commit e push do HTML gerado
+      env:
+        GH_TOKEN: ${{ secrets.GH_PAT }}
       run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git config user.name "Relic Bot"
+        git config user.email "bot@example.com"
         git add output/relics.html
-        git commit -m "Atualização automática das relíquias"
-        git push
+        git commit -m "Atualização automática das relíquias" || echo "Sem mudanças"
+        git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git HEAD:main
