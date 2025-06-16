@@ -3,7 +3,7 @@ name: Atualizar Relíquias
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 12 * * 1' # toda segunda-feira às 9h Brasília (12h UTC)
+    - cron: '0 12 * * 1' # toda segunda-feira às 9h de Brasília (12h UTC)
 
 jobs:
   update-relics:
@@ -24,33 +24,15 @@ jobs:
     - name: Executar script
       run: python relic_extractor.py
 
-    - name: Configurar git
+    - name: Testar segredo
+      run: echo "Segredo GH_PAT está definido"
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+
+    - name: Commit e Push
       run: |
         git config user.name "Relic Bot"
         git config user.email "relic-bot@users.noreply.github.com"
-
-    - name: Criar branch para a atualização
-      run: |
-        git checkout -b update-relics-$(date +%Y%m%d%H%M%S)
-
-    - name: Adicionar arquivo modificado
-      run: git add output/relics.html
-
-    - name: Commitar mudanças
-      run: |
+        git add output/relics.html
         git commit -m "Atualização automática das relíquias" || echo "Nada a commitar"
-
-    - name: Push da branch
-      run: |
-        git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git HEAD
-
-    - name: Criar Pull Request
-      uses: peter-evans/create-pull-request@v5
-      with:
-        token: ${{ secrets.GH_PAT }}
-        commit-message: Atualização automática das relíquias
-        branch: update-relics-$(date +%Y%m%d%H%M%S)
-        title: Atualização automática das relíquias
-        body: Este PR atualiza a tabela de relíquias automaticamente.
-        base: main
-        draft: false
+        git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git main
