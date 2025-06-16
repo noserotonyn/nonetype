@@ -2,38 +2,53 @@ import requests
 from bs4 import BeautifulSoup
 import os
 
-# URL da página oficial de recompensas do Warframe
 URL = "https://warframe-web-assets.nyc3.cdn.digitaloceanspaces.com/uploads/cms/hnfvc0o3jnfvc873njb03enrf56.html#missionRewards"
 
-# Faz o download da página
+print("🔄 Baixando página oficial...")
 response = requests.get(URL)
 soup = BeautifulSoup(response.content, 'html.parser')
 
-# Função para verificar se um texto é uma relíquia
+# Verifica se conseguiu acessar a página
+if response.status_code != 200:
+    print(f"❌ Erro ao acessar a página. Código {response.status_code}")
+    exit(1)
+
+# Define o que é uma relíquia
 def is_relic(text):
     return any(text.startswith(prefix) for prefix in ["Lith ", "Meso ", "Neo ", "Axi "])
 
-# Encontrar a seção de recompensas de missões
-mission_rewards_section = soup.find("h3", string="Mission Rewards")
+# Tenta encontrar a seção "Mission Rewards"
+print("🔍 Procurando seção 'Mission Rewards'...")
+mission_rewards_section = None
+for h in soup.find_all(["h2", "h3"]):
+    if "Mission Rewards" in h.get_text(strip=True):
+        mission_rewards_section = h
+        break
 
 if not mission_rewards_section:
-    print("⚠️ Seção 'Mission Rewards' não encontrada.")
-    exit()
+    print("❌ Seção 'Mission Rewards' não encontrada.")
+    exit(1)
 
-# Encontrar a próxima <table> após o título
+# Tenta encontrar a tabela logo após o título
+print("🔍 Procurando tabela de recompensas...")
 table = mission_rewards_section.find_next("table")
 if not table:
-    print("⚠️ Tabela não encontrada após 'Mission Rewards'.")
-    exit()
+    print("❌ Tabela não encontrada.")
+    exit(1)
 
-# Extrair todas as relíquias únicas da tabela
+# Extrair relíquias da tabela
+print("📦 Extraindo relíquias...")
 relics = set()
 for td in table.find_all("td"):
     text = td.get_text(strip=True)
     if is_relic(text):
         relics.add(text)
 
-# Organizar por tipo
+if not relics:
+    print("⚠️ Nenhuma relíquia encontrada.")
+    exit(1)
+
+# Organiza por tipo
 organized = {"Lith": [], "Meso": [], "Neo": [], "Axi": []}
 for relic in sorted(relics):
     for prefix in organized:
@@ -41,6 +56,7 @@ for relic in sorted(relics):
             organized[prefix].append(relic)
 
 # Gera HTML simples
+print("📝 Gerando HTML...")
 html_content = "<html><head><meta charset='utf-8'><title>Relíquias Atuais</title></head><body>"
 html_content += "<h2>Relíquias Atuais Disponíveis em Missões</h2>"
 
@@ -52,11 +68,10 @@ for category in ["Lith", "Meso", "Neo", "Axi"]:
 
 html_content += "</body></html>"
 
-# Cria pasta de saída se não existir
 os.makedirs("output", exist_ok=True)
 
-# Salva o HTML
-with open("output/relics.html", "w", encoding="utf-8") as f:
+output_path = "output/relics.html"
+with open(output_path, "w", encoding="utf-8") as f:
     f.write(html_content)
 
-print("✅ HTML gerado com sucesso em output/relics.html")
+print(f"✅ HTML gerado com sucesso: {output_path}")
