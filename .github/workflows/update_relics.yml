@@ -3,7 +3,7 @@ name: Atualizar Relíquias
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 12 * * 1' # toda segunda-feira às 9h de Brasília (12 UTC)
+    - cron: '0 12 * * 1' # toda segunda-feira às 9h de Brasília (12h UTC)
 
 jobs:
   update-relics:
