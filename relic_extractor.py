@@ -1,102 +1,93 @@
 import requests
 from bs4 import BeautifulSoup
-import json
-import re
 
-URL = "https://warframe-web-assets.nyc3.cdn.digitaloceanspaces.com/uploads/cms/hnfvc0o3jnfvc873njb03enrf56.html"
+def get_current_relics():
+    # URL oficial das recompensas de missão
+    URL = "https://warframe-webassets.nyc3.cdn.digitaloceanspaces.com/uploads/cms/hnfvc0o3jnfvc873njb03enrf56.html"
+    
+    print("🔄 Obtendo dados da Warframe...")
+    response = requests.get(URL)
+    response.raise_for_status()
+    
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # Encontra todas as tabelas de recompensas
+    reward_tables = soup.find_all('table', class_='reward-table')
+    
+    # Dicionário para armazenar as relíquias por era
+    relics = {
+        'Lith': set(),
+        'Meso': set(),
+        'Neo': set(),
+        'Axi': set()
+    }
+    
+    # Extrai relíquias de cada tabela
+    for table in reward_tables:
+        rows = table.find_all('tr')[1:]  # Ignora o cabeçalho
+        
+        for row in rows:
+            cols = row.find_all('td')
+            if len(cols) >= 2:  # Pelo menos nome e chance
+                relic_name = cols[0].get_text(strip=True)
+                
+                # Filtra apenas relíquias intactas
+                if 'Relic' in relic_name and 'Intact' in relic_name:
+                    for era in relics.keys():
+                        if era in relic_name:
+                            relics[era].add(relic_name.replace(' Intact', ''))
+                            break
+    
+    return relics
 
-print("🔄 Baixando página oficial...")
-response = requests.get(URL)
-response.raise_for_status()
-html = response.text
+def generate_html_table(relics):
+    # Ordena as relíquias em cada era
+    for era in relics:
+        relics[era] = sorted(relics[era])
+    
+    # Determina o número máximo de linhas necessário
+    max_rows = max(len(relics[era]) for era in relics)
+    
+    # Gera a tabela HTML
+    html = """
+    <table border="1" style="border-collapse: collapse; width: 100%;">
+        <thead>
+            <tr>
+                <th style="padding: 8px; background: #f2f2f2;">Lith</th>
+                <th style="padding: 8px; background: #f2f2f2;">Meso</th>
+                <th style="padding: 8px; background: #f2f2f2;">Neo</th>
+                <th style="padding: 8px; background: #f2f2f2;">Axi</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    for i in range(max_rows):
+        html += "<tr>"
+        for era in ['Lith', 'Meso', 'Neo', 'Axi']:
+            relic = relics[era][i] if i < len(relics[era]) else ''
+            html += f'<td style="padding: 6px;">{relic}</td>'
+        html += "</tr>"
+    
+    html += """
+        </tbody>
+    </table>
+    """
+    
+    return html
 
-soup = BeautifulSoup(html, "html.parser")
-
-print("🔍 Procurando JSON com dados...")
-
-# Procurar no <script> que contenha window.__data = {...}
-script = None
-for s in soup.find_all("script"):
-    if s.string and "window.__data" in s.string:
-        script = s.string
-        break
-
-if not script:
-    raise Exception("❌ Script com 'window.__data' não encontrado.")
-
-# Extrair JSON da variável window.__data
-match = re.search(r"window\.__data\s*=\s*({.*?});\s*$", script, re.DOTALL | re.MULTILINE)
-if not match:
-    raise Exception("❌ JSON da variável window.__data não encontrado.")
-
-json_text = match.group(1)
-
-print("📦 Carregando JSON...")
-data = json.loads(json_text)
-
-# Agora, navegue dentro do objeto para encontrar as missões e suas recompensas
-# Pela inspeção, essa estrutura pode variar. Por exemplo:
-
-try:
-    missions = data["props"]["pageProps"]["missions"]
-except KeyError:
-    raise Exception("❌ Estrutura JSON mudou, não encontrou 'missions'.")
-
-print(f"✅ Encontradas {len(missions)} missões.")
-
-# Extração das reliquias (Lith, Meso, Neo, Axi) das recompensas de missão:
-
-eras = {
-    "Lith": set(),
-    "Meso": set(),
-    "Neo": set(),
-    "Axi": set(),
-}
-
-for mission in missions:
-    rewards = mission.get("rewards", [])
-    for reward in rewards:
-        name = reward.get("name", "")
-        for era in eras.keys():
-            if name.startswith(era) and "Radiant" not in name:
-                eras[era].add(name)
-
-print("🔧 Montando tabela HTML...")
-
-html_table = """
-<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%; text-align: left;">
-  <thead>
-    <tr>
-      <th>Lith</th>
-      <th>Meso</th>
-      <th>Neo</th>
-      <th>Axi</th>
-    </tr>
-  </thead>
-  <tbody>
-"""
-
-max_rows = max(len(eras["Lith"]), len(eras["Meso"]), len(eras["Neo"]), len(eras["Axi"]))
-
-list_lith = sorted(eras["Lith"])
-list_meso = sorted(eras["Meso"])
-list_neo = sorted(eras["Neo"])
-list_axi = sorted(eras["Axi"])
-
-for i in range(max_rows):
-    html_table += "<tr>"
-    html_table += f"<td>{list_lith[i] if i < len(list_lith) else ''}</td>"
-    html_table += f"<td>{list_meso[i] if i < len(list_meso) else ''}</td>"
-    html_table += f"<td>{list_neo[i] if i < len(list_neo) else ''}</td>"
-    html_table += f"<td>{list_axi[i] if i < len(list_axi) else ''}</td>"
-    html_table += "</tr>"
-
-html_table += """
-  </tbody>
-</table>
-"""
-
-with open("output/relics.html", "w", encoding="utf-8") as f:
-    f.write(html_table)
-
-print("✅ Arquivo 'output/relics.html' gerado com sucesso.")
+# Execução principal
+if __name__ == "__main__":
+    try:
+        relics = get_current_relics()
+        html_table = generate_html_table(relics)
+        
+        # Salva em arquivo
+        with open('current_relics.html', 'w', encoding='utf-8') as f:
+            f.write(html_table)
+        
+        print("✅ Tabela HTML gerada com sucesso: current_relics.html")
+        print(f"Relíquias encontradas: Lith({len(relics['Lith']}) | Meso({len(relics['Meso'])}) | Neo({len(relics['Neo'])}) | Axi({len(relics['Axi'])})")
+    
+    except Exception as e:
+        print(f"❌ Erro: {e}")
