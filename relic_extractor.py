@@ -43,10 +43,10 @@ html_output = """<!DOCTYPE html>
     <meta charset="UTF-8">
     <title>Relíquias Atuais</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        table { width: 100%%; border-collapse: collapse; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; }
-        th { background-color: #f0f0f0; }
+        body {{ font-family: Arial, sans-serif; padding: 20px; }}
+        table {{ width: 100%; border-collapse: collapse; }}
+        th, td {{ border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; }}
+        th {{ background-color: #f0f0f0; }}
     </style>
 </head>
 <body>
