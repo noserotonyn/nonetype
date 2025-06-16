@@ -5,7 +5,7 @@ import re
 from datetime import datetime
 import os
 
-URL = "https://warframe-webassets.nyc3.cdn.digitaloceanspaces.com/uploads/cms/hnfvc0o3jnfvc873njb03enrf56.html"
+URL = "https://warframe-web-assets.nyc3.cdn.digitaloceanspaces.com/uploads/cms/hnfvc0o3jnfvc873njb03enrf56.html"
 OUTPUT_DIR = "output"
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "relics.html")
 
